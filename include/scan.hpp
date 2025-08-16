@@ -1,18 +1,24 @@
 #pragma once
 
-#include <tuple>
-
 #include "parse.hpp"
 #include "format_string.hpp"
 #include "types.hpp"
 
 namespace stdx {
 
-// Главная функция
-template <details::format_string fmt, details::fixed_string source, typename... Ts>
-consteval details::scan_result<Ts...> scan() { // передайте пакет параметров в scan_result
-// измените реализацию
-    return details::scan_result<Ts...>{42};
+namespace details {
+
+    template <FormatString fmt, FixedString source, typename... Ts, std::size_t... sequence>
+    constexpr ScanResult<Ts...> goThrough(std::integer_sequence<std::size_t, sequence...>) noexcept {
+        return { parseInput<sequence, fmt, source, Ts>()... };
+    }
+
+}
+
+template <FormatString fmt, FixedString source, typename... Ts>
+consteval ScanResult<Ts...> scan() noexcept { 
+    using Range = std::make_integer_sequence<std::size_t, sizeof...(Ts)>;
+    return details::goThrough<fmt, source, Ts...>(Range{});
 }
 
 } // namespace stdx
