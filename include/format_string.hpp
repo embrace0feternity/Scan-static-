@@ -121,13 +121,14 @@ FormatString<formatString>::getNumberPlaceholders() {
 }
 
 
-// Пользовательский литерал
-/*
-ваш код здесь
-ваш код здесь operator"" _fs()  сигнатуру также поменяйте
-{
-ваш код здесь
+template <FixedString frm>
+constexpr auto operator""_frm() {
+    return FormatString<frm>{};
 }
-*/
+
+template <FixedString source>
+constexpr auto operator""_fx() {
+    return FixedString{source};
+}
 
 } // namespace stdx

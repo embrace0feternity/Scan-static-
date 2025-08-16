@@ -41,6 +41,14 @@ public:
 template <typename CharStr, std::size_t S>
 FixedString(const CharStr (&)[S]) -> FixedString<CharStr, S>;
 
+template <FixedString ths, FixedString other> 
+consteval bool compare()  noexcept {
+    if (other.size() != ths.size()) {
+        return false;
+    }
+    return std::equal(ths.data(), ths.data() + ths.size(), other.data());
+}
+
 ///
 ///
 ///

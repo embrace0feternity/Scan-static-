@@ -3,47 +3,59 @@
 #include <gtest/gtest.h>
 
 #include "scan.hpp"
+#include <iostream>
 
 using namespace stdx;
 
-class StdxGroup : public testing::Test {
-protected:
-    
+class StdxGroup : public testing::Test {};
 
-};
+TEST_F(StdxGroup, CheckPatterns) {
+    /// Existed specifiers
+    constexpr FixedString empty{""};
+    constexpr FixedString d{"%d"};
+    constexpr FixedString u{"%u"};
+    constexpr FixedString s{"%s"};
+    /// Non-exist
+    constexpr FixedString n_1{"%non-exist pattern"};
+    constexpr FixedString n_2{"%D"};
+    constexpr FixedString n_3{"%AmIExist?"};
 
-TEST_F(StdxGroup, ScanSimple) {
-    // static_assert();
+    static_assert(
+        details::checkPattern<empty>() && 
+        details::checkPattern<d>() &&
+        details::checkPattern<u>() && 
+        details::checkPattern<s>() &&
+        !details::checkPattern<n_1>() &&
+        !details::checkPattern<n_2>() &&
+        !details::checkPattern<n_3>()
+    );
+    ASSERT_TRUE(true);
 }
 
-    // stdx::details::FixedString f{"q"};
-    // constexpr stdx::details::FormatString<"Add {} to {%d}"> format;
-    // ///                                                 
-    // constexpr stdx::details::FixedString source("Add 125 to 3");
 
-    // constexpr auto test = "qwert";
-    // // constexpr stdx::details::FixedString t(test, test + 2);
+TEST_F(StdxGroup, CheckParseValue) {
+    auto check = []<FixedString pattern, typename T>()consteval {
+        return std::is_same_v<typename details::ParseValue<pattern, T>::Type, T>;
+    };
 
-    // using T = typename decltype(source)::Type;
-    // static_assert(std::is_same_v<T, char>);
-
-    // auto rt = format.getNumberPlaceholders();
-    // decltype(format)::ErrorType error{"qwert"};
-
-    // constexpr auto result = decltype(format)::placeholedrsNumber;
-    // auto positions = decltype(format)::getPlaceholderPositions();
-    // std::cout << "Positions: " << positions.size() << std::endl;
-    // for (const auto &i : positions) {
-    //     std::cout << i.first << ' ' << i.second << std::endl;
-    // }
-    // auto pair_1 = stdx::details::getCurrentSourceForParsing<0, format, source>();
-    // auto pair_2 = stdx::details::getCurrentSourceForParsing<1, format, source>();
-    // std::cout << "source placeholder " << pair_1.first << ' ' << pair_1.second << std::endl;
-    // std::cout << "source placeholder " << pair_2.first << ' ' << pair_2.second << std::endl;
-
-    // auto t = stdx::details::parseInput<0, format, source, int>();
-    // std::cout << "t = " << t << std::endl;
-
+    /// int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, uint64_t, std::string_view
+    /// TODO ADD CV
+    static_assert(true &&
+        check.operator()<""_fx, int>() &&
+        check.operator()<""_fx, int8_t>() &&
+        check.operator()<""_fx, int16_t>() &&
+        check.operator()<"%d"_fx, int32_t>() &&
+        check.operator()<"%d"_fx, int64_t>() &&
+        ///
+        check.operator()<"%u"_fx, uint8_t>() &&
+        check.operator()<"%u"_fx, uint16_t>() &&
+        check.operator()<"%u"_fx, uint32_t>() &&
+        check.operator()<"%u"_fx, uint64_t>() &&
+        ///
+        check.operator()<"%s"_fx, std::string_view>() 
+    );
+    ASSERT_TRUE(true);
+}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
