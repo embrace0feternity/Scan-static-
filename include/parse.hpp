@@ -1,66 +1,87 @@
 #pragma once
 
-#include <charconv>
-#include <concepts>
-
 #include "format_string.hpp"
 #include "types.hpp"
+#include <charconv>
+#include <type_traits>
+
 
 namespace stdx::details {
 
-/// int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, uint64_t, std::string_view
+/// int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, uint64_t,
+/// std::string_view
 
-template <FixedString specifier>
-consteval bool checkPattern() {
-    constexpr std::string_view patterns[] = {"", "%d", "%u", "%s"};
-    for (const auto& pattern : patterns) {
-        if (std::equal(specifier.data(), specifier.data() + specifier.size(), pattern.begin())) {
-            return true;
-        }
+template <FixedString specifier> consteval bool checkPattern() {
+  constexpr std::string_view patterns[] = {"", "%d", "%u", "%s"};
+  for (const auto &pattern : patterns) {
+    if (std::equal(specifier.data(), specifier.data() + specifier.size(),
+                   pattern.begin())) {
+      return true;
     }
-    return false;
+  }
+  return false;
 }
 
-///
-///
-///
-
-template <FixedString specifier, typename SourceType, typename = void> 
-struct ParseValue {
-    using Type = void;
-    static_assert(false, "Unsupported specifier");
+template <FixedString specifier, typename SourceType> struct isValid {
+  // clang-format off
+    constexpr static bool value =
+        (!std::is_reference_v<SourceType> && !std::is_pointer_v<SourceType>) &&
+        ((
+            (isEqual<"%d", specifier>() || isEqual<"", specifier>()) && 
+            std::is_signed_v<SourceType>
+        ) ||
+        (
+            isEqual<"%u", specifier>() && std::is_unsigned_v<SourceType>
+        ));
+  // clang-format on
 };
 
-template <FixedString specifier, typename SourceType> 
-struct ParseValue<specifier, SourceType> {
+///
+///
+///
 
-    using Type = SourceType;
+template <FixedString specifier, typename SourceType, typename = void>
+struct ParseValue {
+  using ErrorType = details::ParseError<typename decltype(specifier)::Type>;
+  using Type = void;
+  using Rt = std::expected<Type, ErrorType>;
 
-    static_assert(((compare<specifier, ""_fx>() ||
-                    compare<specifier, "%d"_fx>()) &&
-                    std::is_signed_v<SourceType>) 
-                    ||
-                    (compare<specifier, "%u"_fx>() &&
-                    std::is_unsigned_v<SourceType>),
-                    "Type/specifier mismatch");  
+  /// Use strType for api compatibility
+  template <FixedString strType> static constexpr Rt convert() {
+    return std::unexpected(ErrorType{"Incorrect type/specifier"});
+  }
+};
 
-    template <FixedString strType> static constexpr SourceType convert() noexcept {
-      SourceType value;
-      std::from_chars(strType.data(), strType.data() + strType.size(), value);
-      // std::cout << "raw string is " << strType.data() << "  value is " << value
-      // << std::endl;
+template <FixedString specifier, typename SourceType>
+struct ParseValue<specifier, SourceType,
+                  std::enable_if_t<isValid<specifier, SourceType>::value>> {
+  using ErrorType = details::ParseError<typename decltype(specifier)::Type>;
+  using Type = SourceType;
+  using ConvertingType = std::remove_cv_t<Type>;
+  using Rt = std::expected<Type, ErrorType>;
+
+  template <FixedString strType> static constexpr Rt convert() noexcept {
+    ConvertingType value;
+    if ((std::from_chars(strType.data(), strType.data() + strType.size(), value)
+             .ec == std::errc{}) ||
+        (strType.data()[0] != '-' && isEqual<"%u"_fx, specifier>())) {
       return value;
     }
+    return std::unexpected(ErrorType{"Can't convert value"});
+  }
 };
 
-template <> 
-struct ParseValue<"%s"_fx, std::string_view> {
-    using Type = std::string_view;
-    static constexpr bool error = true;
+template <typename SourceType>
+struct ParseValue<"%s"_fx, SourceType,
+                  std::enable_if_t<std::is_same_v<std::remove_cv_t<SourceType>,
+                                                  std::string_view>>> {
+  using ErrorType = details::ParseError<typename decltype("%s"_fx)::Type>;
+  using Type = SourceType;
+  using Rt = std::expected<Type, ErrorType>;
 
-    template <FixedString strType> static constexpr std::string_view convert() noexcept {
-      return strType.data();
-    }
+  template <FixedString strType> static constexpr Rt convert() noexcept {
+    return strType.data();
+  }
 };
 
 ///
@@ -128,14 +149,26 @@ consteval auto getCurrentSourceForParsing() {
 
 template <std::size_t I, FormatString fmt, FixedString source, typename T>
 consteval T parseInput() {
-
   constexpr auto ith = getCurrentSourceForParsing<I, fmt, source>();
-  constexpr FixedString<typename decltype(source)::Type,
-                        std::distance(&source.data()[ith.first],
-                                      &source.data()[ith.second])>
+  constexpr FixedString<
+      typename decltype(source)::Type,
+      std::distance(&source.data()[ith.first], &source.data()[ith.second]) + 1>
       subString(&source.data()[ith.first], &source.data()[ith.second]);
-  // return ParseValue<T>::template convert<subString>();
-  return T{};
+
+  constexpr auto specifierBegin = fmt.placeholedrsPositions[I].first;
+  constexpr auto specifierEnd = fmt.placeholedrsPositions[I].second;
+  constexpr FixedString<typename decltype(source)::Type,
+                        specifierEnd - specifierBegin>
+      specifier(&fmt.fmt.data()[specifierBegin + 1],
+                &fmt.fmt.data()[specifierEnd]);
+  constexpr auto result =
+      ParseValue<specifier, T>::template convert<subString>();
+  if constexpr (!result) {
+    static_assert(result, result.error());
+    return T{};
+  } else {
+    return result.value();
+  }
 }
 
 } // namespace stdx::details
