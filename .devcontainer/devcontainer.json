@@ -1,18 +1,21 @@
 {
-    "name": "Ubuntu 24.04 with GCC & Libraries",
-    "build": {
-        "dockerfile": "./Dockerfile",
-        "context": "."
-    },
-    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-    "customizations": {
-      "vscode": {
-        "extensions": [
-          "llvm-vs-code-extensions.vscode-clangd",
-          "vadimcn.vscode-lldb",
-          "twxs.cmake",
-          "ms-vscode.cmake-tools"
-        ]
-      }
+  "name": "Ubuntu25.04 with GCC15",
+  "build": {
+    "dockerfile": "./Dockerfile",
+    "context": "."
+  },
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "vadimcn.vscode-lldb",
+        "twxs.cmake",
+        "ms-vscode.cmake-tools"
+      ]
     }
-  }
+  },
+  "mounts": [
+    "source=${env:USERPROFILE}\\.gitconfig,target=/etc/gitconfig,type=bind,consistency=cached"
+  ]
+}
